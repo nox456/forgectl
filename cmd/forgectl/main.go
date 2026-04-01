@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"github.com/nox456/forgectl/internal/server"
 )
 
 func handleArgs(args []string) (string, error) {
@@ -12,6 +14,12 @@ func handleArgs(args []string) (string, error) {
 	}
 	switch args[0] {
 	case "serve":
+		s := server.NewServer()
+
+		if err := s.Serve(); err != nil {
+			return "", err
+		}
+
 		return "serve", nil
 	case "send":
 		return "send", nil
@@ -25,11 +33,9 @@ func handleArgs(args []string) (string, error) {
 func main() {
 	args := os.Args[1:]
 
-	cmd, err := handleArgs(args)
+	_, err := handleArgs(args)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	fmt.Println(cmd)
 }
