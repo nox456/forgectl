@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 
+	"github.com/nox456/forgectl/internal/client"
+	"github.com/nox456/forgectl/internal/event"
 	"github.com/nox456/forgectl/internal/server"
 )
 
@@ -22,6 +25,23 @@ func handleArgs(args []string) (string, error) {
 
 		return "serve", nil
 	case "send":
+		if len(args) < 2 {
+			return "", errors.New("Usage: forgectl send <event name> [data]")
+		}
+
+		data := make(map[string]any)
+		if len(args) > 2 {
+			if err := json.Unmarshal([]byte(args[2]), &data); err != nil {
+				return "", err
+			}
+		}
+
+		evt := event.NewEvent(args[1], data, "test")
+
+		if err := client.Send(*evt); err != nil {
+			return "", err
+		}
+
 		return "send", nil
 	case "list":
 		return "list", nil
