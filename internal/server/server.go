@@ -10,20 +10,25 @@ import (
 	"syscall"
 
 	"github.com/nox456/forgectl/internal/event"
+	"github.com/nox456/forgectl/internal/function"
 )
 
 const SocketPath = "/tmp/forgectl.sock"
 
 type Response struct {
-	Status string `json:"status"`
+	Status   string   `json:"status"`
+	Messages []string `json:"messages,omitempty"`
 }
 
 type Server struct {
 	listener net.Listener
+	registry *function.Registry
 }
 
-func NewServer() *Server {
-	return &Server{}
+func NewServer(registry *function.Registry) *Server {
+	return &Server{
+		registry: registry,
+	}
 }
 
 func (s *Server) Serve() error {
@@ -63,11 +68,11 @@ func (s *Server) Serve() error {
 				return fmt.Errorf("accept error: %w", err)
 			}
 		}
-		go s.handleConn(conn)
+		go s.handleConn(ctx, conn)
 	}
 }
 
-func (s *Server) handleConn(conn net.Conn) {
+func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 
 	var evt event.Event
@@ -79,7 +84,23 @@ func (s *Server) handleConn(conn net.Conn) {
 
 	fmt.Printf("received event: %s | data: %v\n", evt.Name, evt.Data)
 
+	functions := s.registry.Lookup(evt.Name)
+
 	resp := Response{Status: "accepted"}
+	if len(functions) == 0 {
+		fmt.Println("no functions found for event")
+		resp = Response{Status: "no_functions"}
+	}
+
+	for _, fn := range functions {
+		fmt.Printf("invoking function: Name: %s | ID: %s\n", fn.Name, fn.ID)
+		err := fn.Handler(ctx, evt)
+		if err != nil {
+			resp.Status = "function_error"
+			resp.Messages = append(resp.Messages, err.Error())
+		}
+	}
+
 	encoder := json.NewEncoder(conn)
 	if err := encoder.Encode(resp); err != nil {
 		fmt.Println("failed to encode response:", err)

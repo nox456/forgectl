@@ -8,6 +8,7 @@ import (
 
 	"github.com/nox456/forgectl/internal/client"
 	"github.com/nox456/forgectl/internal/event"
+	"github.com/nox456/forgectl/internal/function"
 	"github.com/nox456/forgectl/internal/server"
 )
 
@@ -17,7 +18,9 @@ func handleArgs(args []string) (string, error) {
 	}
 	switch args[0] {
 	case "serve":
-		s := server.NewServer()
+		registry := function.NewRegistry()
+
+		s := server.NewServer(registry)
 
 		if err := s.Serve(); err != nil {
 			return "", err
