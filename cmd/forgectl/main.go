@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/nox456/forgectl/internal/client"
+	"github.com/nox456/forgectl/internal/engine"
 	"github.com/nox456/forgectl/internal/event"
 	"github.com/nox456/forgectl/internal/function"
 	"github.com/nox456/forgectl/internal/server"
@@ -18,9 +22,14 @@ func handleArgs(args []string) (string, error) {
 	}
 	switch args[0] {
 	case "serve":
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+
+		pool := engine.NewPool(3, 3, ctx)
+
 		registry := function.NewRegistry()
 
-		s := server.NewServer(registry)
+		s := server.NewServer(registry, pool, ctx)
 
 		if err := s.Serve(); err != nil {
 			return "", err

@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
 
+	"github.com/nox456/forgectl/internal/engine"
 	"github.com/nox456/forgectl/internal/event"
 	"github.com/nox456/forgectl/internal/function"
 )
@@ -23,11 +22,15 @@ type Response struct {
 type Server struct {
 	listener net.Listener
 	registry *function.Registry
+	pool     *engine.Pool
+	ctx      context.Context
 }
 
-func NewServer(registry *function.Registry) *Server {
+func NewServer(registry *function.Registry, pool *engine.Pool, ctx context.Context) *Server {
 	return &Server{
 		registry: registry,
+		pool:     pool,
+		ctx:      ctx,
 	}
 }
 
@@ -46,14 +49,10 @@ func (s *Server) Serve() error {
 	defer os.Remove(SocketPath)
 	defer s.listener.Close()
 
-	// Create a context that cancels on SIGINT or SIGTERM.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
 	fmt.Println("forgectl daemon listening on", SocketPath)
 
 	go func() {
-		<-ctx.Done()
+		<-s.ctx.Done()
 		s.listener.Close()
 	}()
 
@@ -61,14 +60,15 @@ func (s *Server) Serve() error {
 		conn, err := s.listener.Accept()
 		if err != nil {
 			select {
-			case <-ctx.Done():
+			case <-s.ctx.Done():
 				fmt.Println("shutting down...")
+				s.pool.Stop()
 				return nil
 			default:
 				return fmt.Errorf("accept error: %w", err)
 			}
 		}
-		go s.handleConn(ctx, conn)
+		go s.handleConn(s.ctx, conn)
 	}
 }
 
@@ -89,16 +89,22 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	resp := Response{Status: "accepted"}
 	if len(functions) == 0 {
 		fmt.Println("no functions found for event")
-		resp = Response{Status: "no_functions"}
+		resp.Status = "no_functions"
 	}
 
 	for _, fn := range functions {
 		fmt.Printf("invoking function: Name: %s | ID: %s\n", fn.Name, fn.ID)
-		err := fn.Handler(ctx, evt)
-		if err != nil {
-			resp.Status = "function_error"
-			resp.Messages = append(resp.Messages, err.Error())
-		}
+
+		s.pool.Run(engine.Job{
+			Function: fn,
+			Event:    evt,
+		})
+
+		// err := fn.Handler(ctx, evt)
+		// if err != nil {
+		// 	resp.Status = "function_error"
+		// 	resp.Messages = append(resp.Messages, err.Error())
+		// }
 	}
 
 	encoder := json.NewEncoder(conn)
