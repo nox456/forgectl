@@ -7,7 +7,7 @@ import (
 	"github.com/nox456/forgectl/internal/event"
 )
 
-type Handler func(ctx context.Context, e event.Event) error
+type Handler func(ctx context.Context, e event.Event) (map[string]any, error)
 
 type Function struct {
 	ID      string
