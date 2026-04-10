@@ -49,13 +49,17 @@ func (p *Pool) worker(id int) {
 	defer p.wg.Done()
 	for job := range p.jobs {
 		ctx, cancel := context.WithCancel(p.ctx)
+
 		fmt.Println("worker", id, "processing job: ", job.Event.Name)
+
 		result, err := job.Function.Handler(ctx, job.Event)
+
 		if err != nil {
 			fmt.Printf("error in function: %s\n  %v\n", job.Function.Name, err)
 		} else {
 			fmt.Printf("result: %v\n", result)
 		}
+
 		cancel()
 	}
 }

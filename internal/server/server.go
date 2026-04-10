@@ -19,17 +19,19 @@ type Response struct {
 }
 
 type Server struct {
-	listener net.Listener
-	registry *function.Registry
-	pool     *engine.Pool
-	ctx      context.Context
+	listener    net.Listener
+	registry    *function.Registry
+	pool        *engine.Pool
+	ctx         context.Context
+	idempotency *engine.IdempotencyGuard
 }
 
 func NewServer(registry *function.Registry, pool *engine.Pool, ctx context.Context) *Server {
 	return &Server{
-		registry: registry,
-		pool:     pool,
-		ctx:      ctx,
+		registry:    registry,
+		pool:        pool,
+		ctx:         ctx,
+		idempotency: engine.NewIdempotencyGuard(),
 	}
 }
 
@@ -81,27 +83,34 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 		return
 	}
 
-	fmt.Printf("received event: %s | data: %v\n", evt.Name, evt.Data)
+	fmt.Printf("received event: %s | data: %v | key: %s\n", evt.Name, evt.Data, evt.IdempotencyKey)
 
-	functions := s.registry.Lookup(evt.Name)
+	exists := s.idempotency.CheckOrClaim(evt.IdempotencyKey)
 
-	resp := Response{Status: "accepted"}
-	if len(functions) == 0 {
-		fmt.Println("no functions found for event")
-		resp.Status = "no_functions"
-	}
+	resp := Response{Status: "skipped"}
+	if exists {
+		fmt.Println("idempotency key exists, skipping")
+		resp.Status = "skipped"
+	} else {
+		functions := s.registry.Lookup(evt.Name)
 
-	for _, fn := range functions {
-		fmt.Printf("invoking function: Name: %s | ID: %s\n", fn.Name, fn.ID)
-
-		job := engine.Job{
-			Function: fn,
-			Event:    evt,
+		if len(functions) == 0 {
+			fmt.Println("no functions found for event")
+			resp.Status = "no_functions"
 		}
 
-		s.pool.Run(job)
-	}
+		resp.Status = "accepted"
+		for _, fn := range functions {
+			fmt.Printf("invoking function: Name: %s | ID: %s\n", fn.Name, fn.ID)
 
+			job := engine.Job{
+				Function: fn,
+				Event:    evt,
+			}
+
+			s.pool.Run(job)
+		}
+	}
 	encoder := json.NewEncoder(conn)
 	if err := encoder.Encode(resp); err != nil {
 		fmt.Println("failed to encode response:", err)
