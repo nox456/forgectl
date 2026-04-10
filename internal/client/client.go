@@ -27,7 +27,7 @@ func Send(evt event.Event) error {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	fmt.Printf("received response: %s\n\n  messages: %s\n", resp.Status, resp.Messages)
+	fmt.Printf("received response: %s\n", resp.Status)
 
 	return nil
 }

@@ -15,8 +15,7 @@ import (
 const SocketPath = "/tmp/forgectl.sock"
 
 type Response struct {
-	Status   string   `json:"status"`
-	Messages []string `json:"messages,omitempty"`
+	Status string `json:"status"`
 }
 
 type Server struct {
@@ -95,16 +94,12 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	for _, fn := range functions {
 		fmt.Printf("invoking function: Name: %s | ID: %s\n", fn.Name, fn.ID)
 
-		s.pool.Run(engine.Job{
+		job := engine.Job{
 			Function: fn,
 			Event:    evt,
-		})
+		}
 
-		// err := fn.Handler(ctx, evt)
-		// if err != nil {
-		// 	resp.Status = "function_error"
-		// 	resp.Messages = append(resp.Messages, err.Error())
-		// }
+		s.pool.Run(job)
 	}
 
 	encoder := json.NewEncoder(conn)

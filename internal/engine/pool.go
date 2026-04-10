@@ -30,7 +30,6 @@ func NewPool(workerCount int, bufferSize int, ctx context.Context) *Pool {
 
 	for i := range workerCount {
 		p.wg.Add(1)
-		fmt.Println("starting worker", i)
 		go p.worker(i)
 	}
 
@@ -48,11 +47,13 @@ func (p *Pool) Stop() {
 
 func (p *Pool) worker(id int) {
 	defer p.wg.Done()
-	fmt.Println("worker", id, "started")
 	for job := range p.jobs {
-		fmt.Println("worker", id, "processing job: ", job.Event.Name)
 		ctx, cancel := context.WithCancel(p.ctx)
-		job.Function.Handler(ctx, job.Event)
+		fmt.Println("worker", id, "processing job: ", job.Event.Name)
+		err := job.Function.Handler(ctx, job.Event)
+		if err != nil {
+			fmt.Printf("error in function: %s\n  %v\n", job.Function.Name, err)
+		}
 		cancel()
 	}
 }
