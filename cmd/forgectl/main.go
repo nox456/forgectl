@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/nox456/forgectl/internal/client"
 	"github.com/nox456/forgectl/internal/engine"
