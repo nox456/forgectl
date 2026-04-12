@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/nox456/forgectl/internal/client"
 	"github.com/nox456/forgectl/internal/engine"
@@ -26,10 +27,10 @@ func handleArgs(args []string) (string, error) {
 		defer stop()
 
 		pool := engine.NewPool(3, 3, ctx)
-
+		debouncer := engine.NewDebouncer(pool)
 		registry := function.NewRegistry()
 
-		s := server.NewServer(registry, pool, ctx)
+		s := server.NewServer(registry, pool, ctx, debouncer)
 
 		if err := s.Serve(); err != nil {
 			return "", err

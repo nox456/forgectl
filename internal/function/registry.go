@@ -3,17 +3,24 @@ package function
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/nox456/forgectl/internal/event"
 )
 
 type Handler func(ctx context.Context, e event.Event) (map[string]any, error)
 
+type DebounceConfig struct {
+	Period time.Duration
+	Key    string
+}
+
 type Function struct {
-	ID      string
-	Name    string
-	Trigger string
-	Handler Handler
+	ID             string
+	Name           string
+	Trigger        string
+	Handler        Handler
+	DebounceConfig *DebounceConfig
 }
 
 type Registry struct {

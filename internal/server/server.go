@@ -24,14 +24,16 @@ type Server struct {
 	pool        *engine.Pool
 	ctx         context.Context
 	idempotency *engine.IdempotencyGuard
+	debouncer   *engine.Debouncer
 }
 
-func NewServer(registry *function.Registry, pool *engine.Pool, ctx context.Context) *Server {
+func NewServer(registry *function.Registry, pool *engine.Pool, ctx context.Context, debouncer *engine.Debouncer) *Server {
 	return &Server{
 		registry:    registry,
 		pool:        pool,
 		ctx:         ctx,
 		idempotency: engine.NewIdempotencyGuard(),
+		debouncer:   debouncer,
 	}
 }
 
@@ -102,13 +104,16 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 		resp.Status = "accepted"
 		for _, fn := range functions {
 			fmt.Printf("invoking function: Name: %s | ID: %s\n", fn.Name, fn.ID)
-
-			job := engine.Job{
-				Function: fn,
-				Event:    evt,
+			if fn.DebounceConfig != nil {
+				s.debouncer.Debounce(fn, evt)
+			} else {
+				job := engine.Job{
+					Function: fn,
+					Event:    evt,
+				}
+				s.pool.Run(job)
 			}
 
-			s.pool.Run(job)
 		}
 	}
 	encoder := json.NewEncoder(conn)
