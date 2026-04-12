@@ -48,7 +48,14 @@ func handleArgs(args []string) (string, error) {
 			}
 		}
 
-		evt := event.NewEvent(args[1], data, "test")
+		var idempotencyKey string
+		if args[3] == "" {
+			idempotencyKey = args[1]
+		} else {
+			idempotencyKey = args[3]
+		}
+
+		evt := event.NewEvent(args[1], data, idempotencyKey)
 
 		if err := client.Send(*evt); err != nil {
 			return "", err
